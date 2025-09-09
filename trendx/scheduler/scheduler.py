@@ -50,40 +50,37 @@ class TrendScheduler:
             self.ai_generator = MockAIGenerator()
             logger.info("Mock AI generator initialized (OpenAI API key not configured)")
 
-        # Initialize publisher (Twitter if configured, otherwise mock)
+        # Initialize publisher (Twitter API - rate limit handling ile)
         from ..publisher.twitter_publisher import TwitterPublisher
+        from ..publisher.mock_publisher import MockPublisher
         if (settings.twitter.api_key and settings.twitter.api_key != "your_twitter_api_key_here" and
             settings.twitter.access_token and settings.twitter.access_token != "your_twitter_access_token_here"):
             self.publisher = TwitterPublisher()
-            logger.info("Twitter publisher initialized")
+            logger.info("Twitter API publisher initialized - Rate limit handling ile")
         else:
             self.publisher = MockPublisher()
-            logger.info("Mock publisher initialized (Twitter API keys not configured)")
+            logger.info("Mock publisher initialized - Twitter API keys not configured")
 
         logger.info("Scheduler components initialized")
 
     def start(self) -> None:
-        """Start the scheduler."""
-        # Add job for hourly trend posting (saat başı 1 tweet)
+        """Start the scheduler - yarın sabahtan başlat."""
+        from datetime import datetime, timedelta
+        
+        # Yarın sabah 08:00'den başlat
+        tomorrow_8am = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        
+        # Add job for hourly trend posting (yarın sabahtan saat başı 1 tweet)
         self.scheduler.add_job(
             self._collect_and_post_trends,
-            trigger=IntervalTrigger(hours=1),  # Her saat başı
+            trigger=IntervalTrigger(hours=1, start_date=tomorrow_8am),  # Yarın sabahtan saat başı
             id="hourly_trend_posting",
             name="Hourly Trend Posting",
             replace_existing=True,
         )
 
-        # Add job for queue processing (5 dakikada bir kontrol)
-        self.scheduler.add_job(
-            self._process_post_queue,
-            trigger=IntervalTrigger(minutes=5),
-            id="process_post_queue",
-            name="Process Post Queue",
-            replace_existing=True,
-        )
-
         self.scheduler.start()
-        logger.info("Scheduler started - Saat başı 1 tweet atılacak")
+        logger.info(f"Scheduler started - Yarın sabahtan ({tomorrow_8am.strftime('%Y-%m-%d %H:%M')}) saat başı 1 tweet atılacak")
 
     def stop(self) -> None:
         """Stop the scheduler."""

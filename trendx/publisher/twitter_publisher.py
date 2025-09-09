@@ -87,9 +87,9 @@ class TwitterPublisher(BasePublisher):
             )
 
         except tweepy.TooManyRequests as e:
-            logger.warning("Twitter rate limit exceeded, waiting before retry", error=str(e))
-            # Rate limit exceeded, wait and retry once
-            await asyncio.sleep(60)  # Wait 1 minute
+            logger.warning("Twitter rate limit exceeded, waiting 15 minutes before retry", error=str(e))
+            # Rate limit exceeded, wait 15 minutes and retry once
+            await asyncio.sleep(900)  # Wait 15 minutes (900 seconds)
             try:
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(

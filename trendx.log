@@ -1,4 +1,4 @@
-{"error": "429 Too Many Requests\nToo Many Requests", "event": "Failed to initialize Twitter API", "logger": "trendx.publisher.twitter_publisher", "level": "error", "timestamp": "2025-09-09T15:45:14.740802Z"}
+{"error": "429 Too Many Requests\nToo Many Requests", "event": "Failed to initialize Twitter API", "logger": "trendx.publisher.twitter_publisher", "level": "error", "timestamp": "2025-09-09T18:35:13.924428Z"}
 🚀 Saat başı tweet scheduler başlatıldı!
 ⏰ Her saat başı 1 tweet atılacak
 🌙 Gece 23:00-07:00 arası tweet atılmayacak

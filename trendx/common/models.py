@@ -98,3 +98,11 @@ class PostHistory(SQLModel, table=True):
             ("twitter_post_id",),
             ("posted_at",),
         ]
+
+
+class PublishResult(SQLModel):
+    """Publish result model."""
+    
+    success: bool
+    post_id: Optional[str] = None
+    error_message: Optional[str] = None
