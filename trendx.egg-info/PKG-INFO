@@ -1,0 +1,147 @@
+Metadata-Version: 2.4
+Name: trendx
+Version: 0.1.0
+Summary: Curate top global & Turkey trending news/videos and post bilingual summaries to X (Twitter)
+Author: TrendX Team
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: tweepy>=4.14.0
+Requires-Dist: pytrends>=4.9.2
+Requires-Dist: praw>=7.7.1
+Requires-Dist: google-api-python-client>=2.108.0
+Requires-Dist: feedparser>=6.0.10
+Requires-Dist: yt-dlp>=2023.11.16
+Requires-Dist: ffmpeg-python>=0.2.0
+Requires-Dist: fastapi>=0.104.1
+Requires-Dist: uvicorn[standard]>=0.24.0
+Requires-Dist: pydantic-settings>=2.0.3
+Requires-Dist: sqlmodel>=0.0.14
+Requires-Dist: apscheduler>=3.10.4
+Requires-Dist: tenacity>=8.2.3
+Requires-Dist: structlog>=23.2.0
+Requires-Dist: httpx>=0.25.2
+Requires-Dist: python-multipart>=0.0.6
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.3; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.21.1; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: ruff>=0.1.6; extra == "dev"
+Requires-Dist: black>=23.11.0; extra == "dev"
+Requires-Dist: mypy>=1.7.1; extra == "dev"
+Requires-Dist: pre-commit>=3.5.0; extra == "dev"
+
+# TrendX
+
+Curate top global & Turkey trending news/videos and post bilingual (TR+EN) summaries to X (Twitter) automatically, several times per day.
+
+## Features
+
+- **Multiple Sources**: Reddit, Google Trends, Twitter Trends, YouTube Trending, RSS feeds
+- **Smart Aggregation**: Deduplication, scoring, and ranking of trending content
+- **Bilingual Content**: AI-generated Turkish and English summaries
+- **Automated Posting**: Scheduled posting with rate limiting and quiet hours
+- **Web Dashboard**: Monitor trends, queue status, and posting history
+- **Safety First**: Content moderation, URL whitelisting, and copyright protection
+
+## Quick Start
+
+1. **Install Dependencies**:
+   ```bash
+   pip install -e .
+   ```
+
+2. **Initialize Configuration**:
+   ```bash
+   python -m trendx init
+   ```
+
+3. **Configure API Keys** (optional for testing):
+   ```bash
+   cp env.example .env
+   # Edit .env with your API keys
+   ```
+
+4. **Test Trend Collection**:
+   ```bash
+   python -m trendx fetch --limit 5
+   ```
+
+5. **Test Content Generation**:
+   ```bash
+   python -m trendx post --dry-run --limit 1
+   ```
+
+6. **Start Web Dashboard**:
+   ```bash
+   python -m trendx web
+   ```
+
+## CLI Commands
+
+- `python -m trendx fetch` - Fetch trending items from sources
+- `python -m trendx score` - Score and rank trending items
+- `python -m trendx queue` - Show post queue status
+- `python -m trendx post --dry-run` - Test content generation
+- `python -m trendx web` - Start web dashboard
+- `python -m trendx init` - Initialize database and configuration
+
+## Architecture
+
+```
+trendx/
+├── sources/          # Pluggable trend sources
+├── aggregator/       # Deduplication and scoring
+├── ai/              # LLM integration for content generation
+├── publisher/       # Twitter/X posting
+├── scheduler/       # Automated scheduling
+├── web/            # FastAPI dashboard
+├── common/         # Configuration, logging, models
+└── tests/          # Unit tests
+```
+
+## Configuration
+
+Key settings in `.env`:
+
+- `SAFE_MODE=true` - Enable safe mode (no media download)
+- `ALLOW_MEDIA_DOWNLOAD=false` - Disable media downloads by default
+- `POSTING_INTERVAL_MINUTES=60` - How often to post
+- `QUIET_HOURS_START=23` - Quiet hours start (24h format)
+- `QUIET_HOURS_END=7` - Quiet hours end (24h format)
+
+## Safety Features
+
+- **Copyright Protection**: No full video re-uploads, prefer links and embeds
+- **Content Moderation**: Language filtering and banned keywords
+- **URL Whitelisting**: Only allow trusted domains
+- **Rate Limiting**: Respect platform limits
+- **Idempotency**: Prevent duplicate posts
+
+## Development
+
+1. **Install Dev Dependencies**:
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
+2. **Run Tests**:
+   ```bash
+   pytest
+   ```
+
+3. **Code Formatting**:
+   ```bash
+   black trendx/
+   ruff check trendx/
+   mypy trendx/
+   ```
+
+## License
+
+MIT License - see LICENSE file for details.
