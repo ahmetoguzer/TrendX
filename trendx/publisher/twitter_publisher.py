@@ -41,7 +41,7 @@ class TwitterPublisher(BasePublisher):
                 consumer_secret=settings.twitter.api_secret,
                 access_token=settings.twitter.access_token,
                 access_token_secret=settings.twitter.access_token_secret,
-                wait_on_rate_limit=True,
+                wait_on_rate_limit=False,  # Manuel rate limit handling
             )
 
             # Verify credentials
@@ -86,6 +86,28 @@ class TwitterPublisher(BasePublisher):
                 post_id=str(response.data["id"]),
             )
 
+        except tweepy.TooManyRequests as e:
+            logger.warning("Twitter rate limit exceeded, waiting before retry", error=str(e))
+            # Rate limit exceeded, wait and retry once
+            await asyncio.sleep(60)  # Wait 1 minute
+            try:
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    self._publish_tweet_sync,
+                    content
+                )
+                logger.info("Tweet published successfully after rate limit retry", post_id=response.data["id"])
+                return PublishResult(
+                    success=True,
+                    post_id=str(response.data["id"]),
+                )
+            except Exception as retry_e:
+                logger.error("Failed to publish tweet after rate limit retry", error=str(retry_e))
+                return PublishResult(
+                    success=False,
+                    error_message=f"Rate limit retry failed: {str(retry_e)}",
+                )
         except Exception as e:
             logger.error("Failed to publish tweet", error=str(e))
             return PublishResult(
@@ -138,10 +160,24 @@ class TwitterPublisher(BasePublisher):
         """
         media_ids = []
 
-        if not content.media_path or not os.path.exists(content.media_path):
+        # Check if we have media URL (not file path)
+        if not content.media_url:
             return media_ids
 
         try:
+            # Download media from URL first
+            import requests
+            import tempfile
+            
+            # Download media file
+            response = requests.get(content.media_url, timeout=30)
+            response.raise_for_status()
+            
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg' if content.media_type == 'image' else '.mp4') as temp_file:
+                temp_file.write(response.content)
+                temp_file_path = temp_file.name
+
             # Initialize media API (v1.1 for media upload)
             auth = tweepy.OAuthHandler(
                 settings.twitter.api_key,
@@ -156,18 +192,27 @@ class TwitterPublisher(BasePublisher):
             # Upload media based on type
             if content.media_type == "video":
                 # Video upload (chunked)
-                media_id = self._upload_video(media_api, content.media_path)
+                media_id = self._upload_video(media_api, temp_file_path)
             else:
                 # Image upload
-                media = media_api.media_upload(content.media_path)
+                media = media_api.media_upload(temp_file_path)
                 media_id = media.media_id
 
             if media_id:
                 media_ids.append(str(media_id))
-                logger.info("Media uploaded successfully", media_id=media_id, media_type=content.media_type)
+                logger.info("Media uploaded successfully", media_id=media_id, media_type=content.media_type, media_url=content.media_url)
+
+            # Clean up temporary file
+            os.unlink(temp_file_path)
 
         except Exception as e:
-            logger.error("Failed to upload media", error=str(e), media_path=content.media_path)
+            logger.error("Failed to upload media", error=str(e), media_url=content.media_url)
+            # Clean up temporary file if it exists
+            try:
+                if 'temp_file_path' in locals():
+                    os.unlink(temp_file_path)
+            except:
+                pass
 
         return media_ids
 

@@ -175,11 +175,10 @@ def post(dry_run: bool, limit: int) -> None:
     """Post trending content to Twitter."""
     logger.info("Starting post operation", dry_run=dry_run, limit=limit)
 
-    # Initialize components
+    # Initialize components - Selenium ile gerçek içerik bulma
+    from .sources.selenium_trends import SeleniumTrendsSource
     sources = {
-        "reddit": RedditTrendSource(),
-        "google_trends": GoogleTrendsSource(),
-        "twitter_trends": TwitterTrendsSource(),
+        "selenium_trends": SeleniumTrendsSource(),  # Selenium ile gerçek içerik
     }
     
     aggregator = TrendAggregator(sources)
@@ -193,7 +192,15 @@ def post(dry_run: bool, limit: int) -> None:
         ai_generator = MockAIGenerator()
         logger.info("Using Mock AI generator (OpenAI API key not configured)")
     
-    publisher = MockPublisher()
+    # Initialize publisher (Twitter if configured, otherwise mock)
+    from .publisher.twitter_publisher import TwitterPublisher
+    if (settings.twitter.api_key and settings.twitter.api_key != "your_twitter_api_key_here" and
+        settings.twitter.access_token and settings.twitter.access_token != "your_twitter_access_token_here"):
+        publisher = TwitterPublisher()
+        logger.info("Using Twitter publisher")
+    else:
+        publisher = MockPublisher()
+        logger.info("Using Mock publisher (Twitter API keys not configured)")
 
     try:
         # Fetch trends
@@ -253,6 +260,43 @@ def web(host: str, port: int, reload: bool) -> None:
 
 
 @cli.command()
+def start() -> None:
+    """Start the hourly tweet scheduler."""
+    logger.info("Starting hourly tweet scheduler")
+    
+    try:
+        import asyncio
+        from .scheduler.scheduler import TrendScheduler
+        
+        async def run_scheduler():
+            # Create and start scheduler
+            scheduler = TrendScheduler()
+            scheduler.start()
+            
+            click.echo("🚀 Saat başı tweet scheduler başlatıldı!")
+            click.echo("⏰ Her saat başı 1 tweet atılacak")
+            click.echo("🌙 Gece 23:00-07:00 arası tweet atılmayacak")
+            click.echo("🛑 Durdurmak için Ctrl+C basın")
+            
+            try:
+                # Keep running
+                while True:
+                    await asyncio.sleep(60)  # 1 dakika bekle
+            except KeyboardInterrupt:
+                click.echo("\n🛑 Scheduler durduruluyor...")
+                scheduler.stop()
+                click.echo("✅ Scheduler durduruldu")
+        
+        # Run async scheduler
+        asyncio.run(run_scheduler())
+            
+    except Exception as e:
+        logger.error("Error starting scheduler", error=str(e))
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+
+@cli.command()
 def init() -> None:
     """Initialize the TrendX database and configuration."""
     logger.info("Initializing TrendX")
@@ -266,6 +310,7 @@ def init() -> None:
     click.echo("1. Copy env.example to .env and configure your API keys")
     click.echo("2. Run 'trendx fetch' to test trend collection")
     click.echo("3. Run 'trendx post --dry-run' to test content generation")
+    click.echo("4. Run 'trendx start' to start hourly tweet scheduler")
 
 
 def main() -> None:

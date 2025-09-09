@@ -16,6 +16,7 @@ class TrendSource(str, Enum):
     TWITTER_TRENDS = "twitter_trends"
     YOUTUBE_TRENDING = "youtube_trending"
     RSS = "rss"
+    SELENIUM_TRENDS = "selenium_trends"
 
 
 class TrendItem(SQLModel, table=True):
@@ -31,6 +32,7 @@ class TrendItem(SQLModel, table=True):
     social_volume: int = Field(default=0)
     is_turkey_related: bool = Field(default=False)
     is_global: bool = Field(default=True)
+    trend_metadata: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

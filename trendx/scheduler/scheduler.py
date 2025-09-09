@@ -32,11 +32,10 @@ class TrendScheduler:
 
     def _initialize_components(self) -> None:
         """Initialize scheduler components."""
-        # Initialize sources
+        # Initialize sources - Selenium ile gerçek içerik bulma
+        from ..sources.selenium_trends import SeleniumTrendsSource
         sources = {
-            "reddit": RedditTrendSource(),
-            "google_trends": GoogleTrendsSource(),
-            "twitter_trends": TwitterTrendsSource(),
+            "selenium_trends": SeleniumTrendsSource(),  # Selenium ile gerçek içerik
         }
 
         # Initialize aggregator
@@ -51,23 +50,30 @@ class TrendScheduler:
             self.ai_generator = MockAIGenerator()
             logger.info("Mock AI generator initialized (OpenAI API key not configured)")
 
-        # Initialize publisher (mock for now)
-        self.publisher = MockPublisher()
+        # Initialize publisher (Twitter if configured, otherwise mock)
+        from ..publisher.twitter_publisher import TwitterPublisher
+        if (settings.twitter.api_key and settings.twitter.api_key != "your_twitter_api_key_here" and
+            settings.twitter.access_token and settings.twitter.access_token != "your_twitter_access_token_here"):
+            self.publisher = TwitterPublisher()
+            logger.info("Twitter publisher initialized")
+        else:
+            self.publisher = MockPublisher()
+            logger.info("Mock publisher initialized (Twitter API keys not configured)")
 
         logger.info("Scheduler components initialized")
 
     def start(self) -> None:
         """Start the scheduler."""
-        # Add job for trend collection and posting
+        # Add job for hourly trend posting (saat başı 1 tweet)
         self.scheduler.add_job(
             self._collect_and_post_trends,
-            trigger=IntervalTrigger(minutes=settings.scheduler.posting_interval_minutes),
-            id="collect_and_post_trends",
-            name="Collect and Post Trends",
+            trigger=IntervalTrigger(hours=1),  # Her saat başı
+            id="hourly_trend_posting",
+            name="Hourly Trend Posting",
             replace_existing=True,
         )
 
-        # Add job for queue processing
+        # Add job for queue processing (5 dakikada bir kontrol)
         self.scheduler.add_job(
             self._process_post_queue,
             trigger=IntervalTrigger(minutes=5),
@@ -77,7 +83,7 @@ class TrendScheduler:
         )
 
         self.scheduler.start()
-        logger.info("Scheduler started")
+        logger.info("Scheduler started - Saat başı 1 tweet atılacak")
 
     def stop(self) -> None:
         """Stop the scheduler."""
@@ -85,25 +91,73 @@ class TrendScheduler:
         logger.info("Scheduler stopped")
 
     async def _collect_and_post_trends(self) -> None:
-        """Collect trends and add to post queue."""
+        """Collect trends and post immediately (saat başı 1 tweet)."""
         try:
-            logger.info("Starting trend collection")
+            logger.info("🚀 Saat başı trend posting başlıyor...")
 
             # Check if we're in quiet hours
             if self._is_quiet_hours():
-                logger.info("Skipping trend collection during quiet hours")
+                logger.info("⏰ Quiet hours - tweet atılmıyor")
                 return
 
-            # Collect trends
-            trends = await self.aggregator.aggregate_trends(limit=5)
-            logger.info("Collected trends", count=len(trends))
+            # Collect trends (sadece 1 tane)
+            trends = await self.aggregator.aggregate_trends(limit=1)
+            logger.info(f"📊 {len(trends)} trend bulundu")
 
-            # Generate content and add to queue
-            for trend in trends:
-                await self._process_trend_item(trend)
+            if not trends:
+                logger.warning("❌ Yeni içerik yok - tweet atılmıyor")
+                return
+
+            # İlk trendi al ve hemen tweet at
+            trend = trends[0]
+            logger.info(f"🎯 Seçilen trend: {trend.title}")
+
+            # Generate tweet content
+            tweet_content = await self.ai_generator.generate_tweet_content(trend)
+            logger.info("🤖 AI tweet içeriği oluşturuldu")
+
+            # Hemen tweet at
+            result = await self.publisher.publish_tweet(tweet_content)
+            
+            if result.success:
+                logger.info(f"✅ Tweet başarıyla atıldı! ID: {result.post_id}")
+                
+                # Database'e kaydet
+                await self._save_tweet_to_db(trend, tweet_content, result.post_id)
+            else:
+                logger.error(f"❌ Tweet atılamadı: {result.error_message}")
 
         except Exception as e:
-            logger.error("Error in trend collection", error=str(e))
+            logger.error(f"❌ Saat başı tweet hatası: {e}")
+
+    async def _save_tweet_to_db(self, trend_item: TrendItem, tweet_content, post_id: str) -> None:
+        """Tweet'i database'e kaydet."""
+        try:
+            with get_session() as session:
+                # Save trend item
+                session.add(trend_item)
+                session.commit()
+                session.refresh(trend_item)
+
+                # Save tweet content
+                db_tweet_content = TweetContent(
+                    trend_item_id=trend_item.id,
+                    turkish_text=tweet_content.turkish_text,
+                    english_text=tweet_content.english_text,
+                    hashtags=tweet_content.hashtags,
+                    media_path=tweet_content.media_path,
+                    media_type=tweet_content.media_type,
+                    media_url=tweet_content.media_url,
+                    quote_tweet_id=tweet_content.quote_tweet_id,
+                    quote_tweet_url=tweet_content.quote_tweet_url,
+                )
+                session.add(db_tweet_content)
+                session.commit()
+                
+                logger.info(f"💾 Tweet database'e kaydedildi: {post_id}")
+                
+        except Exception as e:
+            logger.error(f"❌ Database kaydetme hatası: {e}")
 
     async def _process_trend_item(self, trend_item: TrendItem) -> None:
         """
@@ -236,15 +290,12 @@ class TrendScheduler:
         now = datetime.now()
         current_hour = now.hour
 
-        start_hour = settings.scheduler.quiet_hours_start
-        end_hour = settings.scheduler.quiet_hours_end
+        # Gece 23:00 - Sabah 07:00 arası tweet atma
+        start_hour = 23  # 23:00
+        end_hour = 7     # 07:00
 
-        if start_hour <= end_hour:
-            # Same day quiet hours (e.g., 23:00 to 07:00)
-            return start_hour <= current_hour < end_hour
-        else:
-            # Overnight quiet hours (e.g., 23:00 to 07:00)
-            return current_hour >= start_hour or current_hour < end_hour
+        # Overnight quiet hours (23:00 to 07:00)
+        return current_hour >= start_hour or current_hour < end_hour
 
     def _calculate_next_post_time(self) -> datetime:
         """

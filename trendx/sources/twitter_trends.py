@@ -34,7 +34,7 @@ class TwitterTrendsSource(BaseTrendSource):
         try:
             self.client = tweepy.Client(
                 bearer_token=settings.twitter.bearer_token,
-                wait_on_rate_limit=True,
+                wait_on_rate_limit=False,  # RATE LIMIT YOK!
             )
             logger.info("Twitter API initialized successfully")
         except Exception as e:
@@ -52,9 +52,10 @@ class TwitterTrendsSource(BaseTrendSource):
         Returns:
             List of trend items
         """
-        # Always use mock data for now due to rate limits
-        logger.info("Using mock data due to Twitter API rate limits")
-        return self._get_mock_data(limit)
+        # Try to fetch real trends from Twitter API
+        if not self.client:
+            logger.warning("Twitter client not available, skipping Twitter trends")
+            return []
 
         trends = []
         try:
@@ -68,8 +69,8 @@ class TwitterTrendsSource(BaseTrendSource):
                     timeout=10.0  # 10 second timeout
                 )
             except asyncio.TimeoutError:
-                logger.warning("Twitter hashtag search timed out, using mock data")
-                return self._get_mock_data(limit)
+                logger.warning("Twitter hashtag search timed out, skipping hashtag trends")
+                trending_hashtags = {}
             
             for hashtag, tweet_count in trending_hashtags.items():
                 if len(trends) >= limit:
@@ -98,10 +99,9 @@ class TwitterTrendsSource(BaseTrendSource):
                         timeout=5.0  # 5 second timeout
                     )
                 except asyncio.TimeoutError:
-                    logger.warning("Twitter topic search timed out, using remaining mock data")
-                    # Fill remaining with mock data
-                    remaining_mock = self._get_mock_data(limit - len(trends))
-                    trends.extend(remaining_mock)
+                    logger.warning("Twitter topic search timed out, skipping remaining trends")
+                    # Skip remaining trends instead of using mock data
+                    pass
                 else:
                     for topic, tweet_count in trending_topics.items():
                         if len(trends) >= limit:
@@ -125,7 +125,8 @@ class TwitterTrendsSource(BaseTrendSource):
             
         except Exception as e:
             logger.error("Failed to fetch Twitter trends", error=str(e))
-            return self._get_mock_data(limit)
+            # Return empty list instead of mock data
+            return []
 
         return trends[:limit]
 

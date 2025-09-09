@@ -48,7 +48,8 @@ class GoogleTrendsSource(BaseTrendSource):
             List of trend items
         """
         if not self.pytrends:
-            return self._get_mock_data(limit)
+            logger.warning("Google Trends API not available, skipping Google Trends")
+            return []
 
         trends = []
         try:
@@ -65,7 +66,8 @@ class GoogleTrendsSource(BaseTrendSource):
 
         except Exception as e:
             logger.error("Failed to fetch Google Trends data", error=str(e))
-            return self._get_mock_data(limit)
+            # Return empty list instead of mock data
+            return []
 
         return trends[:limit]
 

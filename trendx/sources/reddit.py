@@ -52,7 +52,8 @@ class RedditTrendSource(BaseTrendSource):
             List of trend items
         """
         if not self.reddit:
-            return self._get_mock_data(limit)
+            logger.warning("Reddit credentials not configured, skipping Reddit trends")
+            return []
 
         trends = []
         subreddits = ["worldnews", "Turkey"]
