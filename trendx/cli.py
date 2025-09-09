@@ -179,10 +179,20 @@ def post(dry_run: bool, limit: int) -> None:
     sources = {
         "reddit": RedditTrendSource(),
         "google_trends": GoogleTrendsSource(),
+        "twitter_trends": TwitterTrendsSource(),
     }
     
     aggregator = TrendAggregator(sources)
-    ai_generator = MockAIGenerator()
+    
+    # Initialize AI generator (OpenAI if configured, otherwise mock)
+    from .ai.openai_generator import OpenAIGenerator
+    if settings.ai.api_key and settings.ai.api_key != "your_openai_api_key_here":
+        ai_generator = OpenAIGenerator()
+        logger.info("Using OpenAI AI generator")
+    else:
+        ai_generator = MockAIGenerator()
+        logger.info("Using Mock AI generator (OpenAI API key not configured)")
+    
     publisher = MockPublisher()
 
     try:

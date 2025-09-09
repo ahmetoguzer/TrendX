@@ -42,8 +42,14 @@ class TrendScheduler:
         # Initialize aggregator
         self.aggregator = TrendAggregator(sources)
 
-        # Initialize AI generator (mock for now)
-        self.ai_generator = MockAIGenerator()
+        # Initialize AI generator (OpenAI if configured, otherwise mock)
+        from ..ai.openai_generator import OpenAIGenerator
+        if settings.ai.api_key and settings.ai.api_key != "your_openai_api_key_here":
+            self.ai_generator = OpenAIGenerator()
+            logger.info("OpenAI AI generator initialized")
+        else:
+            self.ai_generator = MockAIGenerator()
+            logger.info("Mock AI generator initialized (OpenAI API key not configured)")
 
         # Initialize publisher (mock for now)
         self.publisher = MockPublisher()
