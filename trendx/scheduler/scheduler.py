@@ -14,6 +14,7 @@ from ..common.database import get_session
 from ..common.logging import get_logger
 from ..common.models import PostQueue, TrendItem, TweetContent
 from ..publisher import MockPublisher
+from ..publisher.selenium_twitter_publisher import SeleniumTwitterPublisher
 from ..sources import RedditTrendSource, GoogleTrendsSource, TwitterTrendsSource
 
 logger = get_logger(__name__)
@@ -50,37 +51,40 @@ class TrendScheduler:
             self.ai_generator = MockAIGenerator()
             logger.info("Mock AI generator initialized (OpenAI API key not configured)")
 
-        # Initialize publisher (Twitter API - rate limit handling ile)
-        from ..publisher.twitter_publisher import TwitterPublisher
+        # Initialize publisher - Selenium kullan (API limit aşıldı)
         from ..publisher.mock_publisher import MockPublisher
-        if (settings.twitter.api_key and settings.twitter.api_key != "your_twitter_api_key_here" and
-            settings.twitter.access_token and settings.twitter.access_token != "your_twitter_access_token_here"):
-            self.publisher = TwitterPublisher()
-            logger.info("Twitter API publisher initialized - Rate limit handling ile")
-        else:
+        try:
+            self.publisher = SeleniumTwitterPublisher()
+            logger.info("Selenium Twitter publisher initialized - API limit bypass")
+        except Exception as e:
+            logger.warning(f"Failed to initialize Selenium publisher: {e}")
             self.publisher = MockPublisher()
-            logger.info("Mock publisher initialized - Twitter API keys not configured")
+            logger.info("Mock publisher initialized - fallback")
 
         logger.info("Scheduler components initialized")
 
     def start(self) -> None:
-        """Start the scheduler - yarın sabahtan başlat."""
+        """Start the scheduler - bugün akşam 7'den başlat."""
         from datetime import datetime, timedelta
         
-        # Yarın sabah 08:00'den başlat
-        tomorrow_8am = datetime.now().replace(hour=8, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        # Bugün akşam 19:00'dan başlat
+        today_7pm = datetime.now().replace(hour=19, minute=0, second=0, microsecond=0)
         
-        # Add job for hourly trend posting (yarın sabahtan saat başı 1 tweet)
+        # Eğer akşam 7 geçtiyse, yarın akşam 7'den başlat
+        if today_7pm <= datetime.now():
+            today_7pm += timedelta(days=1)
+        
+        # Add job for hourly trend posting (akşam 7'den saat başı 1 tweet)
         self.scheduler.add_job(
             self._collect_and_post_trends,
-            trigger=IntervalTrigger(hours=1, start_date=tomorrow_8am),  # Yarın sabahtan saat başı
+            trigger=IntervalTrigger(hours=1, start_date=today_7pm),  # Akşam 7'den saat başı
             id="hourly_trend_posting",
             name="Hourly Trend Posting",
             replace_existing=True,
         )
 
         self.scheduler.start()
-        logger.info(f"Scheduler started - Yarın sabahtan ({tomorrow_8am.strftime('%Y-%m-%d %H:%M')}) saat başı 1 tweet atılacak")
+        logger.info(f"Scheduler started - Akşam 7'den ({today_7pm.strftime('%Y-%m-%d %H:%M')}) saat başı 1 tweet atılacak")
 
     def stop(self) -> None:
         """Stop the scheduler."""

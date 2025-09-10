@@ -125,10 +125,30 @@ class SeleniumTwitterPublisher:
         try:
             logger.info("✍️ Tweet yazılıyor...")
             
-            # Tweet compose alanını bul
-            compose_area = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-testid='tweetTextarea_0']"))
-            )
+            # Tweet compose alanını bul (yeni selector'lar)
+            compose_selectors = [
+                "[data-testid='tweetTextarea_0']",
+                "[data-testid='tweetTextarea_0']",
+                "[aria-label='Post text']",
+                "[data-testid='tweetTextarea_0']",
+                "div[data-testid='tweetTextarea_0']",
+                "[role='textbox']"
+            ]
+            
+            compose_area = None
+            for selector in compose_selectors:
+                try:
+                    compose_area = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                    logger.info(f"✅ Compose alanı bulundu: {selector}")
+                    break
+                except TimeoutException:
+                    continue
+            
+            if not compose_area:
+                logger.error("❌ Tweet compose alanı bulunamadı")
+                return False
             
             # Tweet metnini hazırla
             tweet_text = f"{content.turkish_text}\n\n{content.english_text}"
@@ -138,9 +158,9 @@ class SeleniumTwitterPublisher:
                 hashtag_text = " ".join([f"#{tag}" for tag in content.hashtags])
                 tweet_text += f"\n\n{hashtag_text}"
             
-            # Link ekle
-            if content.url:
-                tweet_text += f"\n\n{content.url}"
+            # Link ekle (media_url kullan)
+            if content.media_url:
+                tweet_text += f"\n\n{content.media_url}"
             
             # Tweet yazma alanına tıkla ve metni gir
             compose_area.click()
@@ -189,12 +209,33 @@ class SeleniumTwitterPublisher:
         try:
             logger.info("🚀 Tweet post ediliyor...")
             
-            # Tweet butonunu bul ve tıkla
-            tweet_button = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "[data-testid='tweetButton']"))
-            )
+            # Tweet butonunu bul ve tıkla (yeni selector'lar)
+            tweet_button_selectors = [
+                "[data-testid='tweetButton']",
+                "[data-testid='tweetButtonInline']",
+                "[aria-label='Post']",
+                "button[data-testid='tweetButton']",
+                "[role='button'][data-testid='tweetButton']",
+                "button[type='button']:contains('Post')"
+            ]
             
-            tweet_button.click()
+            tweet_button = None
+            for selector in tweet_button_selectors:
+                try:
+                    tweet_button = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                    )
+                    logger.info(f"✅ Tweet butonu bulundu: {selector}")
+                    break
+                except TimeoutException:
+                    continue
+            
+            if not tweet_button:
+                logger.error("❌ Tweet butonu bulunamadı")
+                return None
+            
+            # JavaScript ile tıkla (element click intercepted hatası için)
+            self.driver.execute_script("arguments[0].click();", tweet_button)
             
             # Post başarılı mı kontrol et
             WebDriverWait(self.driver, 10).until(

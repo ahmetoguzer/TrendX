@@ -192,16 +192,16 @@ def post(dry_run: bool, limit: int) -> None:
         ai_generator = MockAIGenerator()
         logger.info("Using Mock AI generator (OpenAI API key not configured)")
     
-    # Initialize publisher (Twitter API - rate limit handling ile)
-    from .publisher.twitter_publisher import TwitterPublisher
+    # Initialize publisher - Selenium kullan (API limit aşıldı)
+    from .publisher.selenium_twitter_publisher import SeleniumTwitterPublisher
     from .publisher.mock_publisher import MockPublisher
-    if (settings.twitter.api_key and settings.twitter.api_key != "your_twitter_api_key_here" and
-        settings.twitter.access_token and settings.twitter.access_token != "your_twitter_access_token_here"):
-        publisher = TwitterPublisher()
-        logger.info("Using Twitter API publisher - Rate limit handling ile")
-    else:
+    try:
+        publisher = SeleniumTwitterPublisher()
+        logger.info("Using Selenium Twitter publisher - API limit bypass")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Selenium publisher: {e}")
         publisher = MockPublisher()
-        logger.info("Using Mock publisher - Twitter API keys not configured")
+        logger.info("Using Mock publisher - fallback")
 
     try:
         # Fetch trends
