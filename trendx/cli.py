@@ -175,10 +175,10 @@ def post(dry_run: bool, limit: int) -> None:
     """Post trending content to Twitter."""
     logger.info("Starting post operation", dry_run=dry_run, limit=limit)
 
-    # Initialize components - Selenium ile gerçek içerik bulma
-    from .sources.selenium_trends import SeleniumTrendsSource
+    # Initialize components - Simple trends kullan (Selenium hatası var)
+    from .sources.simple_trends_fixed import SimpleTrendsFixed
     sources = {
-        "selenium_trends": SeleniumTrendsSource(),  # Selenium ile gerçek içerik
+        "simple_trends": SimpleTrendsFixed(),  # Simple trends kullan
     }
     
     aggregator = TrendAggregator(sources)
@@ -192,16 +192,22 @@ def post(dry_run: bool, limit: int) -> None:
         ai_generator = MockAIGenerator()
         logger.info("Using Mock AI generator (OpenAI API key not configured)")
     
-    # Initialize publisher - Selenium kullan (API limit aşıldı)
-    from .publisher.selenium_twitter_publisher import SeleniumTwitterPublisher
+    # Initialize publisher - UIAutomator2 kullan (Android app automation)
     from .publisher.mock_publisher import MockPublisher
     try:
-        publisher = SeleniumTwitterPublisher()
-        logger.info("Using Selenium Twitter publisher - API limit bypass")
+        from .publisher.uiautomator_twitter_publisher import UIAutomatorTwitterPublisher
+        publisher = UIAutomatorTwitterPublisher()
+        logger.info("Using UIAutomator2 Twitter publisher - Android app automation")
     except Exception as e:
-        logger.warning(f"Failed to initialize Selenium publisher: {e}")
-        publisher = MockPublisher()
-        logger.info("Using Mock publisher - fallback")
+        logger.warning(f"Failed to initialize UIAutomator2 publisher: {e}")
+        try:
+            from .publisher.selenium_twitter_publisher import SeleniumTwitterPublisher
+            publisher = SeleniumTwitterPublisher()
+            logger.info("Using Selenium Twitter publisher - fallback to web automation")
+        except Exception as e2:
+            logger.warning(f"Failed to initialize Selenium publisher: {e2}")
+            publisher = MockPublisher()
+            logger.info("Using Mock publisher - final fallback")
 
     try:
         # Fetch trends

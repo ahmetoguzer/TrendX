@@ -51,15 +51,21 @@ class TrendScheduler:
             self.ai_generator = MockAIGenerator()
             logger.info("Mock AI generator initialized (OpenAI API key not configured)")
 
-        # Initialize publisher - Selenium kullan (API limit aşıldı)
+        # Initialize publisher - UIAutomator2 kullan (Android app automation)
         from ..publisher.mock_publisher import MockPublisher
         try:
-            self.publisher = SeleniumTwitterPublisher()
-            logger.info("Selenium Twitter publisher initialized - API limit bypass")
+            from ..publisher.uiautomator_twitter_publisher import UIAutomatorTwitterPublisher
+            self.publisher = UIAutomatorTwitterPublisher()
+            logger.info("UIAutomator2 Twitter publisher initialized - Android app automation")
         except Exception as e:
-            logger.warning(f"Failed to initialize Selenium publisher: {e}")
-            self.publisher = MockPublisher()
-            logger.info("Mock publisher initialized - fallback")
+            logger.warning(f"Failed to initialize UIAutomator2 publisher: {e}")
+            try:
+                self.publisher = SeleniumTwitterPublisher()
+                logger.info("Selenium Twitter publisher initialized - fallback to web automation")
+            except Exception as e2:
+                logger.warning(f"Failed to initialize Selenium publisher: {e2}")
+                self.publisher = MockPublisher()
+                logger.info("Mock publisher initialized - final fallback")
 
         logger.info("Scheduler components initialized")
 

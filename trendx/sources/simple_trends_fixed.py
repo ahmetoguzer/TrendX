@@ -6,11 +6,12 @@ from typing import List
 from datetime import datetime
 from ..common.models import TrendItem, TrendSource
 from ..common.logging import get_logger
+from .base import BaseTrendSource
 
 logger = get_logger(__name__)
 
 
-class SimpleTrendsFixed:
+class SimpleTrendsFixed(BaseTrendSource):
     """
     Ultra basit trends source - hiç API yok, rate limit yok!
     Sadece hardcoded trends, her zaman çalışır.
@@ -18,6 +19,7 @@ class SimpleTrendsFixed:
 
     def __init__(self):
         """Initialize the simple trends source."""
+        super().__init__("simple_trends_fixed")
         self.trends_data = [
             {
                 "title": "AI Revolution",
